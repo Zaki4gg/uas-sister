@@ -66,9 +66,10 @@ async def main():
         dup = 0
         for t in asyncio.as_completed(tasks):
             out = await t
-            received += out["received"]
-            inserted += out["inserted"]
-            dup += out["duplicates"]
+            # Ganti "received" menjadi "accepted" agar sesuai dengan return main.py
+            received += out.get("accepted", 0) 
+            inserted += out.get("inserted", 0)
+            dup += out.get("duplicates", 0)
 
         print(f"done received={received} inserted={inserted} duplicates={dup} dup_rate={dup/received:.2%}")
 

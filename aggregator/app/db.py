@@ -1,30 +1,35 @@
-import os
-import asyncio
-import pathlib
 import asyncpg
+import os
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgres://user:pass@storage:5432/db")
-
-# kalau file ini ada di aggregator/app/db.py, maka schema ada di aggregator/sql/schema.sql
-SCHEMA_PATH = pathlib.Path(__file__).resolve().parents[1] / "sql" / "schema.sql"
-
-
-async def init_db() -> asyncpg.Pool:
-    # retry connect (biar aman kalau postgres belum ready)
-    last = None
-    for _ in range(60):
-        try:
-            pool = await asyncpg.create_pool(dsn=DATABASE_URL, min_size=1, max_size=10)
-            break
-        except Exception as e:
-            last = e
-            await asyncio.sleep(0.5)
-    else:
-        raise RuntimeError(f"Gagal connect DB: {last!r}")
-
-    # init schema
-    sql = SCHEMA_PATH.read_text(encoding="utf-8")
+# Tambahkan parameter dsn (Data Source Name)
+async def init_db(dsn: str = None):
+    # Jika dsn tidak diberikan, ambil dari ENV (fallback untuk docker)
+    if dsn is None:
+        dsn = os.getenv("DATABASE_URL", "postgresql://user:pass@localhost:5432/db")
+    
+    # Buat koneksi pool menggunakan dsn tersebut
+    pool = await asyncpg.create_pool(dsn=dsn)
+    
+    # Jalankan query inisialisasi tabel (opsional jika sudah ada di init.sql)
     async with pool.acquire() as conn:
-        await conn.execute(sql)
-
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS processed_events (
+                topic TEXT,
+                event_id TEXT,
+                ts_ingest TIMESTAMPTZ,
+                source TEXT,
+                payload JSONB,
+                PRIMARY KEY (topic, event_id)
+            );
+            CREATE TABLE IF NOT EXISTS stats (
+                key TEXT PRIMARY KEY,
+                val BIGINT DEFAULT 0
+            );
+            INSERT INTO stats (key, val) VALUES 
+                ('received', 0), 
+                ('unique_processed', 0), 
+                ('duplicate_dropped', 0)
+            ON CONFLICT DO NOTHING;
+        """)
+        
     return pool

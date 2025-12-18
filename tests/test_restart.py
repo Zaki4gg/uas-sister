@@ -2,9 +2,8 @@ import pytest
 from datetime import datetime, timezone
 from asgi_lifespan import LifespanManager
 import httpx
-
-from aggregator.app.main import create_app
-from aggregator.app.settings import Settings
+from aggregator.app.main import create_app  # Tambahkan ini
+from aggregator.app.settings import Settings # Tambahkan ini
 
 
 def ev(topic="auth", event_id="RST-1"):
